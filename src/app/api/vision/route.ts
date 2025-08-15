@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
             ],
           },
         ],
-        max_tokens: 300,
+        max_tokens: 100,
         temperature: 0.2,
       }),
     });

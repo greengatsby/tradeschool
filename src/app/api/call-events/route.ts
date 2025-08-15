@@ -140,7 +140,7 @@ async function handleCaptureScreenshot(toolCall: ToolCall, callId: string, messa
 
   const dataUrl = `data:${mimeType};base64,${base64Payload}`;
 
-  const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+  const openaiRes = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${OPENAI_API_KEY}`,
@@ -148,30 +148,78 @@ async function handleCaptureScreenshot(toolCall: ToolCall, callId: string, messa
     },
     body: JSON.stringify({
       model: 'gpt-5-mini',
-      text: { verbosity: "low" },
-      messages: [
+      input: [
         {
+          type: 'message',
           role: 'user',
           content: [
-            { type: 'text', text: effectiveQuestion },
-            { type: 'image_url', image_url: { url: dataUrl } },
+            { type: 'input_text', text: effectiveQuestion },
+            { type: 'input_image', image_url: dataUrl },
           ],
         },
       ],
+      text: { verbosity: "low" },
     }),
   });
 
 
-  console.log('openaiRes', openaiRes);
+
   if (!openaiRes.ok) {
     const errText = await openaiRes.text();
     throw new Error(`Vision LLM error: ${errText}`);
   }
 
   const json = await openaiRes.json();
-  const answer: string = json?.choices?.[0]?.message?.content || '';
-  console.log('answer', answer);
+  
+  // Extract the text from the Responses API structure
+  const messageOutput = json?.output?.find((item: any) => item.type === 'message');
+  const textContent = messageOutput?.content?.find((item: any) => item.type === 'output_text');
+  const answer: string = textContent?.text || 'No response text found';
+  
+  console.log('Extracted answer:', answer);
   return answer;
+}
+
+// Handle markStepComplete tool
+async function handleMarkStepComplete(toolCall: ToolCall, callId: string, message: CallMessage): Promise<string> {
+  const { stepId, roomName: roomFromParams, targetIdentity: targetFromParams } = toolCall.parameters;
+  
+  // Allow fallback to message.call context if not provided explicitly
+  const roomName = roomFromParams || message.call?.id;
+  const targetIdentity = targetFromParams || message.call?.user?.id;
+  
+  if (!roomName || !targetIdentity || stepId === undefined) {
+    throw new Error('roomName, targetIdentity, and stepId are required for markStepComplete');
+  }
+
+  const apiKey = process.env.LIVEKIT_API_KEY;
+  const apiSecret = process.env.LIVEKIT_API_SECRET;
+  const wsUrl = process.env.LIVEKIT_URL || process.env.NEXT_PUBLIC_LIVEKIT_URL;
+  
+  if (!apiKey || !apiSecret || !wsUrl) {
+    throw new Error('LiveKit not configured');
+  }
+
+  // Derive HTTP base from env values
+  const httpBase = process.env.NEXT_PUBLIC_LIVEKIT_URL?.startsWith('http')
+    ? process.env.NEXT_PUBLIC_LIVEKIT_URL
+    : wsUrl.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:');
+
+  const roomService = new RoomServiceClient(httpBase, apiKey, apiSecret);
+
+  const requestId = `req_${Math.random().toString(36).slice(2)}_${Date.now()}`;
+  const payload = {
+    type: 'mark_step_complete',
+    stepId: Number(stepId),
+    requestId,
+  };
+
+  // Send request to the target user via data channel
+  await roomService.sendData(roomName, new TextEncoder().encode(JSON.stringify(payload)), 1, {
+    destinationIdentities: [targetIdentity],
+  });
+
+  return `Step ${stepId} marked complete`;
 }
 
 export async function POST(req: NextRequest) {
@@ -231,6 +279,10 @@ export async function POST(req: NextRequest) {
             result = await handleCaptureScreenshot(toolCall, callId, message);
             break;
           
+          case 'markStepComplete':
+            result = await handleMarkStepComplete(toolCall, callId, message);
+            break;
+          
           default:
             console.warn(`Unknown tool: ${toolCall.name}`);
             return NextResponse.json({ 
@@ -273,15 +325,23 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Companion endpoint for the client to deliver screenshot results
+// Companion endpoint for the client to deliver screenshot results and step completion confirmations
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
-    const { requestId, imageBase64, question, answer } = body || {};
+    const { requestId, imageBase64, question, answer, stepCompleted, success } = body || {};
+    
     if (!requestId) {
       return NextResponse.json({ error: 'requestId required' }, { status: 400 });
     }
 
+    // Handle step completion confirmations
+    if (stepCompleted !== undefined) {
+      console.log(`Step ${stepCompleted} completion confirmed for request ${requestId}`);
+      return NextResponse.json({ ok: true, stepCompleted, success });
+    }
+
+    // Handle screenshot submissions
     const waiter = pendingScreenshots.get(requestId);
     if (!waiter) {
       return NextResponse.json({ error: 'No pending request' }, { status: 404 });
