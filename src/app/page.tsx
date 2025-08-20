@@ -320,7 +320,7 @@ IMPORTANT INSTRUCTIONS:
             voice: 'bbee10a8-4f08-4c5c-8282-e69299115055',
           }
         },
-        callbackUrl: process.env.NEXT_PUBLIC_CALLBACK_URL || "https://trades.roley.ai/api/call-events",
+        callbackUrl: `${process.env.NEXT_PUBLIC_BASE_URL || "https://trades.roley.ai"}/api/call-events`,
       };
 
       const resp = await fetch(`/api/livekit/token`, {
