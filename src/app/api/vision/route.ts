@@ -21,47 +21,109 @@ export async function POST(req: NextRequest) {
     if (!imageBase64) return NextResponse.json({ error: 'Missing imageBase64' }, { status: 400 });
     if (!question) return NextResponse.json({ error: 'Missing question' }, { status: 400 });
 
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    // Commented out ChatGPT implementation
+    // const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    // if (!OPENAI_API_KEY) {
+    //   const mockAnswer = `Mock vision answer to: ${question}`;
+    //   return NextResponse.json({ answer: mockAnswer, mock: true });
+    // }
+    // const isDataUrl = imageBase64.startsWith('data:');
+    // const dataUrl = isDataUrl ? imageBase64 : `data:image/png;base64,${imageBase64}`;
+    // const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+    //   method: 'POST',
+    //   headers: {
+    //     'Authorization': `Bearer ${OPENAI_API_KEY}`,
+    //     'Content-Type': 'application/json',
+    //   },
+    //   body: JSON.stringify({
+    //     model: 'gpt-4o-mini',
+    //     messages: [
+    //       {
+    //         role: 'user',
+    //         content: [
+    //           { type: 'text', text: question },
+    //           { type: 'image_url', image_url: { url: dataUrl } },
+    //         ],
+    //       },
+    //     ],
+    //     max_tokens: 100,
+    //     temperature: 0.2,
+    //   }),
+    // });
+    // if (!openaiRes.ok) {
+    //   const err = await openaiRes.text();
+    //   return NextResponse.json({ error: 'Vision LLM error', details: err }, { status: openaiRes.status });
+    // }
+    // const json = await openaiRes.json();
+    // const answer: string = json?.choices?.[0]?.message?.content || '';
+    // return NextResponse.json({ answer });
 
-    if (!OPENAI_API_KEY) {
+    // Using Anthropic Claude-4-Sonnet for image analysis
+    const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+
+    if (!ANTHROPIC_API_KEY) {
       // Fallback mock if no key is configured
       const mockAnswer = `Mock vision answer to: ${question}`;
       return NextResponse.json({ answer: mockAnswer, mock: true });
     }
 
-    // If client sent raw base64, convert to data URL; otherwise pass-through
+    // Extract base64 data from data URL if needed
     const isDataUrl = imageBase64.startsWith('data:');
-    const dataUrl = isDataUrl ? imageBase64 : `data:image/png;base64,${imageBase64}`;
+    let base64Data: string;
+    let mediaType: string;
+    
+    if (isDataUrl) {
+      const matches = imageBase64.match(/^data:([^;]+);base64,(.+)$/);
+      if (!matches) {
+        return NextResponse.json({ error: 'Invalid data URL format' }, { status: 400 });
+      }
+      mediaType = matches[1];
+      base64Data = matches[2];
+    } else {
+      base64Data = imageBase64;
+      mediaType = 'image/png'; // default assumption
+    }
 
-    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+    const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'x-api-key': ANTHROPIC_API_KEY,
         'Content-Type': 'application/json',
+        // 'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 100,
+        temperature: 0.2,
         messages: [
           {
             role: 'user',
             content: [
-              { type: 'text', text: question },
-              { type: 'image_url', image_url: { url: dataUrl } },
+              {
+                type: 'image',
+                source: {
+                  type: 'base64',
+                  media_type: mediaType,
+                  data: base64Data,
+                },
+              },
+              {
+                type: 'text',
+                text: question,
+              },
             ],
           },
         ],
-        max_tokens: 100,
-        temperature: 0.2,
       }),
     });
 
-    if (!openaiRes.ok) {
-      const err = await openaiRes.text();
-      return NextResponse.json({ error: 'Vision LLM error', details: err }, { status: openaiRes.status });
+    if (!anthropicRes.ok) {
+      const err = await anthropicRes.text();
+      return NextResponse.json({ error: 'Vision LLM error', details: err }, { status: anthropicRes.status });
     }
 
-    const json = await openaiRes.json();
-    const answer: string = json?.choices?.[0]?.message?.content || '';
+    const json = await anthropicRes.json();
+    const answer: string = json?.content?.[0]?.text || '';
     return NextResponse.json({ answer });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Vision analysis failed' }, { status: 500 });
