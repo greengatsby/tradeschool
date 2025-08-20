@@ -137,10 +137,38 @@ export default function Home() {
       }
       shutterAudioRef.current.currentTime = 0;
       shutterAudioRef.current.play().catch(() => {
-        // Ignore play errors (autoplay restrictions, etc.)
+        // Autoplay restrictions on mobile (especially iOS) can block this.
+        // Provide a subtle haptic fallback if available.
+        if ('vibrate' in navigator) {
+          try { (navigator as any).vibrate?.(50); } catch { }
+        }
       });
     } catch {
       // Ignore audio errors
+    }
+  }, []);
+
+  // Attempt to unlock/prime the shutter sound within a user gesture
+  const primeShutterSound = useCallback(() => {
+    try {
+      if (!shutterAudioRef.current) {
+        const audio = new Audio('/shutter_take_a_look.mp3');
+        audio.preload = 'auto';
+        audio.volume = 0.3;
+        shutterAudioRef.current = audio;
+      }
+      const audio = shutterAudioRef.current;
+      if (!audio) return;
+      // Play and immediately pause to unlock audio on iOS within a user gesture
+      audio.currentTime = 0;
+      void audio.play().then(() => {
+        audio.pause();
+        audio.currentTime = 0;
+      }).catch(() => {
+        // Ignore; user gesture may not be active yet
+      });
+    } catch {
+      // Ignore
     }
   }, []);
 
@@ -265,6 +293,8 @@ export default function Home() {
   const connect = useCallback(async () => {
     if (connecting || connected) return;
     setConnecting(true);
+    // Prime the shutter sound synchronously within the click handler to satisfy iOS policies
+    primeShutterSound();
     try {
       const agentConfig = {
         name: 'Vision Assistant',
@@ -388,7 +418,7 @@ IMPORTANT INSTRUCTIONS:
     } finally {
       setConnecting(false);
     }
-  }, [roomName, username, addLog, handleData, connecting, connected, startLocalCamera]);
+  }, [roomName, username, addLog, handleData, connecting, connected, startLocalCamera, primeShutterSound]);
 
   const disconnect = useCallback(async () => {
     try {
