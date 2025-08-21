@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import Image from 'next/image';
 import { Room, RoomEvent, Track, RemoteTrack } from 'livekit-client';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { CheckCircle2, Circle, Clock } from 'lucide-react';
@@ -21,56 +20,36 @@ interface Step {
   verificationCriteria: string[];
 }
 
-export default function LiveKitPage() {
+interface Lab {
+  id: number;
+  title: string;
+  description: string;
+  systemPrompt: string;
+  firstMessage: string;
+}
+
+interface LabProps {
+  lab: Lab;
+  steps: Omit<Step, 'status'>[];
+  onBack: () => void;
+}
+
+export default function Lab({ lab, steps: initialSteps, onBack }: LabProps) {
   const [room, setRoom] = useState<Room | null>(null);
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
-  const [roomName, setRoomName] = useState<string>(() => `demo-${Date.now()}`);
+  const [roomName, setRoomName] = useState<string>(() => `lab-${lab.id}-${Date.now()}`);
   const [username, setUsername] = useState<string>(() => `web-${Math.random().toString(36).slice(2, 8)}`);
   const isMobile = useIsMobile();
 
-  // Step tracking state
-  const [steps, setSteps] = useState<Step[]>([
-    {
-      id: 1,
-      title: 'Wire Preparation',
-      description: 'Strip and prepare the wires for connection',
-      status: 'in_progress',
-      verificationCriteria: [
-        'Three wires visible (hot/black, neutral/white, ground/green or bare)',
-        'Wire ends stripped approximately 3/4 inch (three-quarters inch)',
-        'Clean copper visible at wire ends',
-        'No damaged insulation along wire length'
-      ]
-    },
-    {
-      id: 2,
-      title: 'Switch Wiring',
-      description: 'Connect wires to the light switch correctly',
-      status: 'pending',
-      verificationCriteria: [
-        'Hot (black) wire connected to brass/gold terminal',
-        'Neutral (white) wire properly connected or wire-nutted if not needed',
-        'Ground wire connected to green ground screw',
-        'All terminal screws tightened clockwise around wire',
-        'No exposed copper outside terminals'
-      ]
-    },
-    {
-      id: 3,
-      title: 'Lamp Socket Wiring',
-      description: 'Complete the circuit by wiring the lamp socket',
-      status: 'pending',
-      verificationCriteria: [
-        'Hot wire connected to brass/gold terminal on socket',
-        'Neutral wire connected to silver terminal on socket',
-        'Ground wire properly secured if present',
-        'All connections tight and secure',
-        'Socket shell properly assembled'
-      ]
-    }
-  ]);
+  // Step tracking state - initialize with first step as in_progress
+  const [steps, setSteps] = useState<Step[]>(() =>
+    initialSteps.map((step, index) => ({
+      ...step,
+      status: index === 0 ? 'in_progress' : 'pending'
+    }))
+  );
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -297,22 +276,8 @@ export default function LiveKitPage() {
     try {
       const agentConfig = {
         name: 'Vision Assistant',
-        systemPrompt: `You are an electrical tradeschool lab assistant helping the user complete a 3-step wiring exercise:
-
-STEP 1 - Wire Preparation: Check that wires are properly stripped (3/4 inch exposed copper), all three wires present (hot/black, neutral/white, ground/green or bare).
-
-STEP 2 - Switch Wiring: Verify hot wire to brass terminal, neutral properly managed, ground to green screw, all connections tight.
-
-STEP 3 - Lamp Socket Wiring: Confirm hot to brass terminal, neutral to silver terminal, ground secured, socket assembled.
-
-IMPORTANT INSTRUCTIONS:
-- Guide the user through one step at a time
-- When you verify a step is complete through screenshot analysis, use the markStepComplete tool
-- Always write out measurements like "three-quarters inch" not "3/4 inch"
-- Keep responses short and focused on the current step
-- Before marking complete, explicitly verify ALL criteria for that step
-- Celebrate progress when steps are completed!`,
-        firstMessage: 'Hi! Let\'s wire up your light switch and lamp socket. We\'ll go through 3 steps together. First, let\'s check your wire preparation. Can you show me your wires?',
+        systemPrompt: lab.systemPrompt,
+        firstMessage: lab.firstMessage,
         tools: [
           {
             id: "captureScreenshot",
@@ -345,11 +310,10 @@ IMPORTANT INSTRUCTIONS:
           provider: 'cartesia',
           config: {
             model: 'sonic-2',
-            // voice: '1c0a8256-df2c-47d8-a0c0-7f07262eaf16',
             voice: 'bbee10a8-4f08-4c5c-8282-e69299115055',
           }
         },
-        callbackUrl: "https://roley.ngrok.app/api/call-events",
+        callbackUrl: `${process.env.NEXT_PUBLIC_BASE_URL || "https://trades.roley.ai"}/api/call-events`,
       };
 
       const resp = await fetch(`/api/livekit/token`, {
@@ -417,7 +381,7 @@ IMPORTANT INSTRUCTIONS:
     } finally {
       setConnecting(false);
     }
-  }, [roomName, username, addLog, handleData, connecting, connected, startLocalCamera, primeShutterSound]);
+  }, [roomName, username, addLog, handleData, connecting, connected, startLocalCamera, primeShutterSound, lab.systemPrompt, lab.firstMessage]);
 
   const disconnect = useCallback(async () => {
     try {
@@ -436,33 +400,29 @@ IMPORTANT INSTRUCTIONS:
     }
   }, [room, addLog]);
 
-  const testCapture = useCallback(async () => {
-    const img = await captureScreenshot();
-    if (!img) {
-      addLog('no image');
-      return;
-    }
-    const res = await fetch('/api/vision', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imageBase64: img, question: 'What do you see?' }),
-    });
-    const data = await res.json();
-    addLog(`test vision: ${data?.answer || 'no answer'}`);
-  }, [captureScreenshot, addLog]);
-
   return (
     <div className="min-h-screen p-4 md:p-6 bg-gray-50">
       <div className="max-w-5xl mx-auto space-y-6 md:space-y-8">
-        <div className="flex items-center justify-center gap-2">
-          <Image src="/lms_logo.svg" alt="Roley logo" width={20} height={20} priority />
-          <h1 className="text-xl md:text-2xl font-semibold text-center">Roley Tradeschool Assistant</h1>
+        <div className="flex items-center justify-between">
+          <button
+            onClick={onBack}
+            className="px-4 py-2 text-sm bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+          >
+            ← Back to Labs
+          </button>
+          <h1 className="text-xl md:text-2xl font-semibold text-center flex-1">
+            {lab.title}
+          </h1>
+          <div className="w-20" /> {/* Spacer for centering */}
         </div>
 
         {!connected ? (
           <div className="mt-2 md:mt-4">
             <div className="mx-auto max-w-md bg-white rounded-xl shadow-sm p-6 text-center">
               <p className="text-gray-600 text-sm md:text-base mb-4">
+                {lab.description}
+              </p>
+              <p className="text-gray-500 text-sm mb-4">
                 Start a call to get real-time help. You can switch cameras on mobile once connected.
               </p>
               <button
@@ -470,7 +430,7 @@ IMPORTANT INSTRUCTIONS:
                 onClick={connect}
                 disabled={connecting}
               >
-                {connecting ? 'Connecting…' : 'Connect'}
+                {connecting ? 'Connecting…' : 'Start Lab'}
               </button>
             </div>
           </div>
@@ -593,5 +553,3 @@ IMPORTANT INSTRUCTIONS:
     </div>
   );
 }
-
-
