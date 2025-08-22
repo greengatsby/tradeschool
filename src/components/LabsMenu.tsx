@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { supabase } from '@/utils/supabase';
-import { ChevronRight, Clock, CheckCircle2 } from 'lucide-react';
+import { ChevronRight, Clock } from 'lucide-react';
 
 interface Lab {
   id: number;
@@ -106,7 +106,6 @@ export default function LabsMenu({ onSelectLab }: LabsMenuProps) {
           </div>
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-            <span className="ml-2 text-gray-600">Loading labs...</span>
           </div>
         </div>
       </div>
@@ -122,8 +121,7 @@ export default function LabsMenu({ onSelectLab }: LabsMenuProps) {
             <h1 className="text-xl md:text-2xl font-semibold text-center">Roley Tradeschool Assistant</h1>
           </div>
           <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-            <p className="text-red-800 font-medium">Error loading labs</p>
-            <p className="text-red-600 text-sm mt-1">{error}</p>
+            <p className="text-red-800 font-medium">Couldn't load labs</p>
             <button
               onClick={() => window.location.reload()}
               className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
@@ -153,10 +151,7 @@ export default function LabsMenu({ onSelectLab }: LabsMenuProps) {
         </div>
 
         <div className="mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Available Labs</h2>
-          <p className="text-gray-600 text-sm">
-            Choose a lab to start your hands-on learning experience with AI-powered guidance.
-          </p>
+          <h2 className="text-lg font-semibold text-gray-900">Labs</h2>
         </div>
 
         {labs.length === 0 ? (
@@ -164,10 +159,7 @@ export default function LabsMenu({ onSelectLab }: LabsMenuProps) {
             <div className="text-gray-400 mb-4">
               <Clock className="w-12 h-12 mx-auto" />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Labs Available</h3>
-            <p className="text-gray-600">
-              Labs are being prepared. Check back soon!
-            </p>
+            <h3 className="text-lg font-medium text-gray-900">No labs yet</h3>
           </div>
         ) : (
           <div className="grid gap-4 md:gap-6">
@@ -184,24 +176,12 @@ export default function LabsMenu({ onSelectLab }: LabsMenuProps) {
                         <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
                           {lab.title}
                         </h3>
-                        <div className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                          <CheckCircle2 className="w-3 h-3" />
-                          Available
-                        </div>
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500" aria-hidden="true"></span>
                       </div>
-                      <p className="text-gray-600 text-sm leading-relaxed">
-                        {lab.description}
-                      </p>
+                      <p className="text-gray-600 text-sm truncate">{lab.description}</p>
                     </div>
                     <div className="flex-shrink-0">
                       <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
-                    </div>
-                  </div>
-
-                  <div className="mt-4 pt-4 border-t border-gray-100">
-                    <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>Interactive AI guidance</span>
-                      <span>Click to start →</span>
                     </div>
                   </div>
                 </div>
@@ -210,11 +190,6 @@ export default function LabsMenu({ onSelectLab }: LabsMenuProps) {
           </div>
         )}
 
-        <div className="mt-8 text-center">
-          <p className="text-xs text-gray-500">
-            More labs coming soon. Each lab provides step-by-step guidance with real-time feedback.
-          </p>
-        </div>
       </div>
     </div>
   );
