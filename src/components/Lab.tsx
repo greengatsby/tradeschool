@@ -26,6 +26,7 @@ interface Lab {
   description: string;
   systemPrompt: string;
   firstMessage: string;
+  agentConfig: any;
 }
 
 interface LabProps {
@@ -275,44 +276,9 @@ export default function Lab({ lab, steps: initialSteps, onBack }: LabProps) {
     primeShutterSound();
     try {
       const agentConfig = {
-        name: 'Vision Assistant',
+        ...lab.agentConfig,
         systemPrompt: lab.systemPrompt,
         firstMessage: lab.firstMessage,
-        tools: [
-          {
-            id: "captureScreenshot",
-            name: "captureScreenshot",
-            description: "Capture a frame from the user camera to analyze",
-            parameters: {
-              type: 'object',
-              properties: {
-                question: { type: 'string', description: 'What do you want to know from the screenshot?' }
-              },
-              required: ['question']
-            },
-            fire_and_forget: false
-          },
-          {
-            id: "markStepComplete",
-            name: "markStepComplete",
-            description: "Mark a step as complete when all verification criteria are met",
-            parameters: {
-              type: 'object',
-              properties: {
-                stepId: { type: 'number', description: 'The step number to mark complete (1, 2, or 3)' }
-              },
-              required: ['stepId']
-            },
-            fire_and_forget: false
-          }
-        ],
-        tts: {
-          provider: 'cartesia',
-          config: {
-            model: 'sonic-2',
-            voice: 'bbee10a8-4f08-4c5c-8282-e69299115055',
-          }
-        },
         callbackUrl: `${process.env.NEXT_PUBLIC_BASE_URL || "https://trades.roley.ai"}/api/call-events`,
       };
 

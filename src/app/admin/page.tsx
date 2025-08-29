@@ -16,6 +16,7 @@ interface Lab {
   description: string;
   system_prompt: string;
   first_message: string;
+  agent_config: any;
   created_at: string;
   updated_at: string;
 }
@@ -36,6 +37,7 @@ interface NewLab {
   description: string;
   system_prompt: string;
   first_message: string;
+  agent_config: any;
 }
 
 interface NewLabStep {
@@ -63,7 +65,45 @@ export default function AdminPage() {
     title: '',
     description: '',
     system_prompt: '',
-    first_message: ''
+    first_message: '',
+    agent_config: {
+      name: 'Vision Assistant',
+      tools: [
+        {
+          id: "captureScreenshot",
+          name: "captureScreenshot",
+          description: "Capture a frame from the user camera to analyze",
+          parameters: {
+            type: "object",
+            properties: {
+              question: { type: "string", description: "What do you want to know from the screenshot?" }
+            },
+            required: ["question"]
+          },
+          fire_and_forget: false
+        },
+        {
+          id: "markStepComplete",
+          name: "markStepComplete",
+          description: "Mark a step as complete when all verification criteria are met",
+          parameters: {
+            type: "object",
+            properties: {
+              stepId: { type: "number", description: "The step number to mark complete (1, 2, or 3)" }
+            },
+            required: ["stepId"]
+          },
+          fire_and_forget: false
+        }
+      ],
+      tts: {
+        provider: "cartesia",
+        config: {
+          model: "sonic-2",
+          voice: "bbee10a8-4f08-4c5c-8282-e69299115055"
+        }
+      }
+    }
   });
 
   const [newStep, setNewStep] = useState<NewLabStep>({
@@ -142,7 +182,50 @@ export default function AdminPage() {
       if (error) throw error;
 
       setLabs([...labs, data]);
-      setNewLab({ title: '', description: '', system_prompt: '', first_message: '' });
+      setNewLab({
+        title: '',
+        description: '',
+        system_prompt: '',
+        first_message: '',
+        agent_config: {
+          name: 'Vision Assistant',
+          tools: [
+            {
+              id: "captureScreenshot",
+              name: "captureScreenshot",
+              description: "Capture a frame from the user camera to analyze",
+              parameters: {
+                type: "object",
+                properties: {
+                  question: { type: "string", description: "What do you want to know from the screenshot?" }
+                },
+                required: ["question"]
+              },
+              fire_and_forget: false
+            },
+            {
+              id: "markStepComplete",
+              name: "markStepComplete",
+              description: "Mark a step as complete when all verification criteria are met",
+              parameters: {
+                type: "object",
+                properties: {
+                  stepId: { type: "number", description: "The step number to mark complete (1, 2, or 3)" }
+                },
+                required: ["stepId"]
+              },
+              fire_and_forget: false
+            }
+          ],
+          tts: {
+            provider: "cartesia",
+            config: {
+              model: "sonic-2",
+              voice: "bbee10a8-4f08-4c5c-8282-e69299115055"
+            }
+          }
+        }
+      });
       setShowNewLabForm(false);
       showMessage('Lab created successfully!');
     } catch (err) {
@@ -158,7 +241,8 @@ export default function AdminPage() {
           title: lab.title,
           description: lab.description,
           system_prompt: lab.system_prompt,
-          first_message: lab.first_message
+          first_message: lab.first_message,
+          agent_config: lab.agent_config
         })
         .eq('id', lab.id);
 
@@ -391,6 +475,26 @@ export default function AdminPage() {
                   placeholder="Initial message from AI assistant"
                   rows={3}
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Agent Configuration (JSON)</label>
+                <Textarea
+                  value={JSON.stringify(newLab.agent_config, null, 2)}
+                  onChange={(e) => {
+                    try {
+                      const parsed = JSON.parse(e.target.value);
+                      setNewLab({ ...newLab, agent_config: parsed });
+                    } catch (error) {
+                      // Keep the text as is if it's not valid JSON yet
+                    }
+                  }}
+                  placeholder="Agent configuration in JSON format"
+                  rows={10}
+                  className="font-mono text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Configure agent name, tools, and TTS settings in JSON format
+                </p>
               </div>
               <div className="flex gap-2">
                 <Button onClick={handleCreateLab} className="flex items-center gap-2">
@@ -701,6 +805,25 @@ export default function AdminPage() {
                     onChange={(e) => setEditingLab({ ...editingLab, first_message: e.target.value })}
                     rows={3}
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Agent Configuration (JSON)</label>
+                  <Textarea
+                    value={JSON.stringify(editingLab.agent_config, null, 2)}
+                    onChange={(e) => {
+                      try {
+                        const parsed = JSON.parse(e.target.value);
+                        setEditingLab({ ...editingLab, agent_config: parsed });
+                      } catch (error) {
+                        // Keep the text as is if it's not valid JSON yet
+                      }
+                    }}
+                    rows={10}
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Configure agent name, tools, and TTS settings in JSON format
+                  </p>
                 </div>
                 <div className="flex gap-2">
                   <Button onClick={() => handleUpdateLab(editingLab)} className="flex items-center gap-2">

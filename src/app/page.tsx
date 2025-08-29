@@ -11,6 +11,7 @@ interface Lab {
   description: string;
   systemPrompt: string;
   firstMessage: string;
+  agentConfig: any;
 }
 
 interface LabStep {

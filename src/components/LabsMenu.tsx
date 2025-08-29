@@ -11,6 +11,7 @@ interface Lab {
   description: string;
   systemPrompt: string;
   firstMessage: string;
+  agentConfig: any;
 }
 
 interface LabStep {
@@ -52,7 +53,8 @@ export default function LabsMenu({ onSelectLab }: LabsMenuProps) {
           title: lab.title,
           description: lab.description,
           systemPrompt: lab.system_prompt,
-          firstMessage: lab.first_message
+          firstMessage: lab.first_message,
+          agentConfig: lab.agent_config
         }));
 
         setLabs(formattedLabs);
