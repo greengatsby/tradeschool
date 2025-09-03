@@ -282,16 +282,13 @@ export default function AdminPage() {
 
   const handleCreateStep = async (labId: number) => {
     try {
-      const { data, error } = await supabase
-        .from('tradeschool_lab_steps')
-        .insert([{
-          lab_id: labId,
-          ...newStep
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
+      const resp = await fetch('/api/admin/steps', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lab_id: labId, ...newStep }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data?.error || 'Failed to create step');
 
       const updatedSteps = { ...labSteps };
       if (!updatedSteps[labId]) {
@@ -311,17 +308,19 @@ export default function AdminPage() {
 
   const handleUpdateStep = async (step: LabStep) => {
     try {
-      const { error } = await supabase
-        .from('tradeschool_lab_steps')
-        .update({
+      const resp = await fetch('/api/admin/steps', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: step.id,
           step_number: step.step_number,
           title: step.title,
           description: step.description,
-          verification_criteria: step.verification_criteria
-        })
-        .eq('id', step.id);
-
-      if (error) throw error;
+          verification_criteria: step.verification_criteria,
+        }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(data?.error || 'Failed to update step');
 
       const updatedSteps = { ...labSteps };
       updatedSteps[step.lab_id] = updatedSteps[step.lab_id].map(s =>
@@ -342,12 +341,13 @@ export default function AdminPage() {
     }
 
     try {
-      const { error } = await supabase
-        .from('tradeschool_lab_steps')
-        .delete()
-        .eq('id', stepId);
-
-      if (error) throw error;
+      const resp = await fetch('/api/admin/steps', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: stepId }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(data?.error || 'Failed to delete step');
 
       const updatedSteps = { ...labSteps };
       updatedSteps[labId] = updatedSteps[labId].filter(s => s.id !== stepId);
