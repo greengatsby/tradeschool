@@ -173,13 +173,13 @@ export default function AdminPage() {
 
   const handleCreateLab = async () => {
     try {
-      const { data, error } = await supabase
-        .from('tradeschool_labs')
-        .insert([newLab])
-        .select()
-        .single();
-
-      if (error) throw error;
+      const resp = await fetch('/api/admin/labs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newLab),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data?.error || 'Failed to create lab');
 
       setLabs([...labs, data]);
       setNewLab({
@@ -235,18 +235,20 @@ export default function AdminPage() {
 
   const handleUpdateLab = async (lab: Lab) => {
     try {
-      const { error } = await supabase
-        .from('tradeschool_labs')
-        .update({
+      const resp = await fetch('/api/admin/labs', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: lab.id,
           title: lab.title,
           description: lab.description,
           system_prompt: lab.system_prompt,
           first_message: lab.first_message,
-          agent_config: lab.agent_config
-        })
-        .eq('id', lab.id);
-
-      if (error) throw error;
+          agent_config: lab.agent_config,
+        }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(data?.error || 'Failed to update lab');
 
       setLabs(labs.map(l => l.id === lab.id ? lab : l));
       setEditingLab(null);
